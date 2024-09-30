@@ -57,9 +57,9 @@ def main():
                     converged = True
                     break
                 centroids = new_centroids
-            groups = {f'Clusters {i+1}': [] for i in range(k)}
+            groups = {f'Cluster {i+1}': [] for i in range(k)}
             for i, label in enumerate(labels):
-                groups[f'Clusters {label+1}'].append({'x': points[i, 0], 'y': points[i, 1]})
+                groups[f'Cluster {label+1}'].append({'x': points[i, 0], 'y': points[i, 1]})
             result = {
                 'clusters': {**groups},
                 'centroids': [{'x': c[0], 'y': c[1]} for c in centroids],

@@ -62,7 +62,7 @@
     <script>
       var points = [];
       var centroids = [];
-      var color = [];
+      var color = {};
 
       function getRandomColor() {
         const letters = "0123456789ABCDEF";
@@ -303,7 +303,52 @@
         }
       }
 
+      function run() {
+        if (
+          chart.data.datasets[0].data.length !=
+          parseInt(document.getElementById("n-clusters").value, 10)
+        ) {
+          alert(
+            "Please select exactly " +
+              parseInt(document.getElementById("n-clusters").value, 10) +
+              " centroid(s) manually or click 'Generate New Dataset' before running KMeans."
+          );
+        } else {
+          fetch("/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              func: "run",
+              k: parseInt(document.getElementById("n-clusters").value, 10),
+              points: points,
+              centroids: centroids,
+            }),
+          })
+            .then((response) => response.json())
+            .then((json) => {
+              centroids = json["centroids"];
+              chart.data.datasets = chart.data.datasets.slice(0, 1);
+              chart.data.datasets[0].data = json["centroids"];
+              chart.update();
+              Object.keys(json["clusters"]).forEach((key) => {
+                chart.data.datasets.push({
+                  type: "scatter",
+                  label: key,
+                  data: json["clusters"][key],
+                  backgroundColor: color[key],
+                });
+              });
+              chart.update("none");
+            });
+        }
+      }
+
       reset();
+      color = generateColorDict(
+        parseInt(document.getElementById("n-clusters").value, 10)
+      );
 
       function addData(label, newData) {
         chart.data.labels.push(label);
