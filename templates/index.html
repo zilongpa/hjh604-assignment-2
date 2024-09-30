@@ -1,19 +1,350 @@
 <head>
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+  <title>KMeans Clustering Algorithm</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='water.css') }}" />
 
-<body>
-    <div class="App">
-        <header class="App-header">
-            <img src="{{ url_for('static', filename='Octocat.png') }}" class="App-logo" alt="logo" />
-            <p>
-                GitHub Codespaces <span class="heart">♥️</span> Flask
-            </p>
-            <p class="small">
-                Edit <code>templates/index.html</code> and refresh to see your changes!
-            </p>
-        </header>
+  <body>
+    <header>
+      <h1>KMeans Clustering Algorithm</h1>
+    </header>
+    <hgroup>
+      <h3>Number of Clusters (k):</h3>
+      <input
+        type="number"
+        name="n-clusters"
+        id="n-clusters"
+        min="1"
+        step="1"
+        value="6"
+        oninput="
+          if (validity.valid){
+            if (document.getElementById('init-method').value == 'manual') {
+              if (chart.data.datasets[0].data.length == parseInt(document.getElementById('n-clusters').value,10)){
+                document.getElementById('step').disabled = false;
+                document.getElementById('run').disabled = false;
+              }
+            } else {
+              document.getElementById('step').disabled = false;
+              document.getElementById('run').disabled = false;
+            }
+          } else {
+            document.getElementById('step').disabled = true;
+            document.getElementById('run').disabled = true;
+            chart.data.datasets[0].data=[];
+            chart.update();
+          }"
+        pattern="^[1-9][0-9]*$"
+        title="Only positive integers are allowed"
+        required
+      />
+    </hgroup>
+    <hgroup>
+      <h3>Initialization Method:</h3>
+      <select name="init-method" id="init-method" oninput="onInput(value)">
+        <option value="r">Random</option>
+        <option value="ff">Farthest First</option>
+        <option value="kmpp">KMeans++</option>
+        <option value="manual">Manual</option>
+      </select>
+    </hgroup>
+    <br />
+    <hgroup>
+      <button id="step" onclick="step()">Step Through KMeans</button><br />
+      <button id="run" onclick="run()">Run to Convergence</button><br />
+      <button id="generate" onclick="generate()">Generate New Dataset</button
+      ><br />
+      <button id="reset" onclick="reset()">Reset Algorithm</button><br />
+    </hgroup>
+    <br />
+    <div style="position: relative; height: 40vh; width: 90vw">
+      <canvas id="chart"></canvas>
     </div>
-</body>
+    <script src="{{ url_for('static', filename='chart.js') }}"></script>
+    <script>
+      var points = [];
+      var centroids = [];
+      var color = [];
 
-</html>
+      function getRandomColor() {
+        const letters = "0123456789ABCDEF";
+        let color = "#";
+        for (let i = 0; i < 6; i++) {
+          color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+      }
+
+      function generateColorDict(length) {
+        const colorDict = {};
+        for (let i = 1; i <= length; i++) {
+          colorDict[`Cluster ${i}`] = getRandomColor();
+        }
+        return colorDict;
+      }
+
+      const ctx = document.getElementById("chart");
+      const plugin = {
+        id: "customCanvasBackgroundColor",
+        beforeDraw: (chart, args, options) => {
+          const { ctx } = chart;
+          ctx.save();
+          ctx.globalCompositeOperation = "destination-over";
+          ctx.fillStyle = options.color || "#99ffff";
+          ctx.fillRect(0, 0, chart.width, chart.height);
+          ctx.restore();
+        },
+      };
+
+      chart = new Chart(ctx, {
+        data: {
+          datasets: [
+            {
+              type: "scatter",
+              label: "Centroids",
+              data: [],
+              pointStyle: "crossRot",
+              borderWidth: 2,
+              radius: 5,
+              borderColor: "black",
+              backgroundColor: "black",
+            },
+            {
+              type: "scatter",
+              label: "Points",
+              data: [],
+            },
+          ],
+        },
+        options: {
+          onClick: (e) => {
+            if (document.getElementById("init-method").value == "manual") {
+              if (
+                parseInt(document.getElementById("n-clusters").value, 10) < 1 ||
+                isNaN(parseInt(document.getElementById("n-clusters").value, 10))
+              ) {
+                alert(
+                  "Please enter a valid number of clusters before selecting centroids."
+                );
+              } else {
+                if (
+                  chart.data.datasets[0].data.length <
+                  parseInt(document.getElementById("n-clusters").value, 10)
+                ) {
+                  const canvasPosition = Chart.helpers.getRelativePosition(
+                    e,
+                    chart
+                  );
+                  const dataX = chart.scales.x.getValueForPixel(
+                    canvasPosition.x
+                  );
+                  const dataY = chart.scales.y.getValueForPixel(
+                    canvasPosition.y
+                  );
+                  chart.data.datasets[0].data.push({ x: dataX, y: dataY });
+                  chart.update("none");
+                  if (
+                    chart.data.datasets[0].data.length ==
+                    parseInt(document.getElementById("n-clusters").value, 10)
+                  ) {
+                    color = generateColorDict(
+                      parseInt(document.getElementById("n-clusters").value, 10)
+                    );
+                    document.getElementById("step").disabled = false;
+                    document.getElementById("run").disabled = false;
+                  }
+                } else {
+                  alert(
+                    "Please increase the number of clusters to add more centroids."
+                  );
+                }
+              }
+            }
+          },
+          responsive: true,
+          scales: {
+            x: {
+              min: -10,
+              max: 10,
+            },
+            y: {
+              min: -10,
+              max: 10,
+            },
+          },
+          plugins: {
+            customCanvasBackgroundColor: {
+              color: "white",
+            },
+            title: {
+              display: true,
+              text: "Kmeans Clustering Visualization",
+            },
+            colors: {
+              enabled: true,
+              forceOverride: false,
+            },
+          },
+        },
+        plugins: [plugin],
+      });
+
+      function onInput(value) {
+        if (value != "manual") {
+          document.getElementById("step").disabled = false;
+          document.getElementById("run").disabled = false;
+          chart.data.datasets[0].data = [];
+          chart.update();
+        } else {
+          document.getElementById("step").disabled = true;
+          document.getElementById("run").disabled = true;
+          chart.data.datasets[0].data = [];
+          chart.update();
+        }
+      }
+
+      function generate() {
+        color = generateColorDict(
+          parseInt(document.getElementById("n-clusters").value, 10)
+        );
+        fetch("/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            func: "generate",
+            k: parseInt(document.getElementById("n-clusters").value, 10),
+            mode: document.getElementById("init-method").value,
+            points: points,
+          }),
+        })
+          .then((response) => response.json())
+          .then((json) => {
+            centroids = json["centroids"];
+            chart.data.datasets[0].data = json["centroids"];
+            chart.update();
+          });
+      }
+
+      function reset() {
+        fetch("/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ func: "reset" }),
+        })
+          .then((response) => response.json())
+          .then((json) => {
+            points = json["points"];
+            chart.data.datasets = [
+              {
+                type: "scatter",
+                label: "Centroids",
+                data: [],
+                pointStyle: "crossRot",
+                borderWidth: 2,
+                radius: 5,
+                borderColor: "black",
+                backgroundColor: "black",
+              },
+              {
+                type: "scatter",
+                label: "Points",
+                data: json["points"],
+              },
+            ];
+            chart.update();
+          });
+      }
+
+      function step() {
+        if (
+          chart.data.datasets[0].data.length !=
+          parseInt(document.getElementById("n-clusters").value, 10)
+        ) {
+          alert(
+            "Please select exactly " +
+              parseInt(document.getElementById("n-clusters").value, 10) +
+              " centroid(s) manually or click 'Generate New Dataset' before running KMeans."
+          );
+        } else {
+          fetch("/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              func: "step",
+              k: parseInt(document.getElementById("n-clusters").value, 10),
+              points: points,
+              centroids: centroids,
+            }),
+          })
+            .then((response) => response.json())
+            .then((json) => {
+              if (json["converged"]) {
+                alert("KMeans has converged.");
+              } else {
+                centroids = json["centroids"];
+                chart.data.datasets = chart.data.datasets.slice(0, 1);
+                chart.data.datasets[0].data = json["centroids"];
+                chart.update();
+                Object.keys(json["clusters"]).forEach((key) => {
+                  chart.data.datasets.push({
+                    type: "scatter",
+                    label: key,
+                    data: json["clusters"][key],
+                    backgroundColor: color[key],
+                  });
+                });
+                chart.update("none");
+              }
+            });
+        }
+      }
+
+      reset();
+
+      function addData(label, newData) {
+        chart.data.labels.push(label);
+        chart.data.datasets.forEach((dataset) => {
+          dataset.data.push(newData);
+        });
+        chart.update();
+      }
+
+      function removeData() {
+        chart.data.labels.pop();
+        chart.data.datasets.forEach((dataset) => {
+          dataset.data.pop();
+        });
+        chart.update();
+      }
+
+      function updateData() {
+        chart.data.labels.pop();
+        chart.data.datasets.forEach((dataset) => {
+          dataset.data = [
+            {
+              x: -100,
+              y: 0,
+            },
+            {
+              x: 10,
+              y: 10,
+            },
+            {
+              x: 110,
+              y: 5,
+            },
+            {
+              x: 0.51,
+              y: 5.5,
+            },
+          ];
+        });
+        chart.update();
+      }
+    </script>
+  </body>
+</head>
